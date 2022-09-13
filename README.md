@@ -55,7 +55,18 @@ saveRDS(data.hg38, paste0(projects[proj], "_450.RDS"))
 To see type and count of samples in each cohort:
 
 ```R
+rds_list <- list.files()[grepl('^TCGA',list.files(), perl = T )]
+
+sample_count <- list()
+for(f in 1:length(rds_list)){
+  df <- readRDS(rds_list[f])
+  sample_count[[f]] <- unclass(table(substr(colnames(df),14,15)))
+}
+names(sample_count) <- rds_list
 
 ```
+The following cohorts will be dropped off because of > 100 samples:
+
+`TCGA-ACC_450.RDS` , `TCGA-CHOL_450.RDS`, `TCGA-DLBC_450.RDS`, `TCGA-KICH_450.RDS`, `TCGA-MESO_450.RDS`, `TCGA-OV_450.RDS`, `TCGA-UCS_450.RDS`, `TCGA-UVM_450.RDS`, `TCGA-READ_450.RDS`. 
 
 
