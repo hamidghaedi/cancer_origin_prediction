@@ -65,8 +65,17 @@ for(f in 1:length(rds_list)){
 names(sample_count) <- rds_list
 
 ```
-The following cohorts will be dropped off because of > 100 samples:
+The following cohorts wont be anymore considered because of < 100 samples, and need to be moved from the current directory:
 
 `TCGA-ACC_450.RDS` , `TCGA-CHOL_450.RDS`, `TCGA-DLBC_450.RDS`, `TCGA-KICH_450.RDS`, `TCGA-MESO_450.RDS`, `TCGA-OV_450.RDS`, `TCGA-UCS_450.RDS`, `TCGA-UVM_450.RDS`, `TCGA-READ_450.RDS`. 
 
+So the `rds_list` needs to be updated. The next step is to select tumor samples from each cohort:
 
+```R
+rds_list <- list.files()[grepl('^TCGA',list.files(), perl = T )]
+
+for(f in 1:length(rds_list)){
+  df <- readRDS(rds_list[f])
+  df <- df[, substr(colnames(df),14,15) == "01"]
+  saveRDS(df, paste0(rds_list[f], "_450_tumor_samples.RDS"))
+}
