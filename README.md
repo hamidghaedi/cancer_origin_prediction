@@ -16,19 +16,14 @@ print(paste0("Unique projects in the dataset:", length(unique(sample_cancer$proj
 
 # selecting tumor sample from projects with more than 100 samples
 sample_cancer <- data.frame(sample_cancer)
-subSample <- sample_cancer[sample_cancer$sample_type == "disease tissue", ]
+sample_cancer$toSelect <- paste0(sample_cancer$project_id, "_", sample_cancer$sample_type)
 
-# projects with more than 100 samples
-#proj100 <- unique(subSample$project_id)[table(subSample$project_id) > 100]
-project_count <- data.frame(unclass(table(subSample$project_id)))
-project_count$project_id <- rownames(project_count)
-names(project_count)[1] <- "count"
-# finding projects with count > 100:
-proj100 <- project_count$project_id[project_count$count >= 100]
+# selecting
+toSelect <- unique(sample_cancer$toSelect)
+toSelect <- toSelect[table(sample_cancer$toSelect) >= 100]
 
-# 
-metDat <- subSample[subSample$project_id %in% proj100,]
-
+#
+metDat <- subSample[subSample$toSelect %in% toSelect,]
 
 ```
 If you like to test on the TCGA data directly, her is how to download data:
@@ -69,7 +64,7 @@ The following cohorts wont be anymore considered because of < 100 samples, and n
 
 `TCGA-ACC_450.RDS` , `TCGA-CHOL_450.RDS`, `TCGA-DLBC_450.RDS`, `TCGA-KICH_450.RDS`, `TCGA-MESO_450.RDS`, `TCGA-OV_450.RDS`, `TCGA-UCS_450.RDS`, `TCGA-UVM_450.RDS`, `TCGA-READ_450.RDS`. 
 
-So the `rds_list` needs to be updated. The next step is to select tumor samples from each cohort:
+So the `rds_list` needs to be updated. The next step is to select tumor samples from each cohort. This can be done by looking at element 14-15 of the sample names, as "01" indicate primry tumor. 
 
 ```R
 rds_list <- list.files()[grepl('^TCGA',list.files(), perl = T )]
@@ -77,5 +72,67 @@ rds_list <- list.files()[grepl('^TCGA',list.files(), perl = T )]
 for(f in 1:length(rds_list)){
   df <- readRDS(rds_list[f])
   df <- df[, substr(colnames(df),14,15) == "01"]
-  saveRDS(df, paste0(rds_list[f], "_450_tumor_samples.RDS"))
+  saveRDS(df, paste0(substr(rds_list[f],1,length(rds_list[f])-8,, "_450_tumor_samples.RDS"))
 }
+```
+Now we can merge the objects together to make a huge matrix which is needed for down stream analysis
+
+```R
+met_list <- list.files()[grepl('*_450_tumor_samples.RDS',list.files(), perl = T )]
+met <- readRDS(met_list)[5]
+
+```
+
+## Working with methylation data from EWAS
+
+```shell 
+# running an interactive job on ComputeCanada
+salloc --time=2:0:0 --ntasks=1 --account=def-gooding-ab --mem=150G
+```
+
+Then in ```R```:
+
+```
+library(BGData)
+load.BGData("cancer_methylation_v1.RData", envir = parent.frame())
+
+# subset of probes from Mc Intyre paper:
+mcIn <- data.table::fread("main_FinalMcIntyreKeepProbesAndInfo.csv")
+
+#subsetting the methylation matrix
+metMat <- cancer_download[which(rownames(cancer_download) %in% mcIn$ID), ]
+metMat <- metMat[, which(colnames(metMat) %in% metDat$sample_id)]
+
+# drop probes with more than 80% NA;
+
+r_idx <- which(rowMeans(!is.na(metMat)) > 0.80)
+metMat <- metMat[r_idx, ]
+
+rN <- rownames(metMat_2)[r_idx]
+
+# impute values for NAs
+metMat <- sapply(metMat, as.numeric)
+
+r_idx <- which(rowMeans(!is.na(metMat)) > 0.80)
+metMat <- metMat[r_idx, ]
+
+rN <- rN[r_idx]
+
+# writing huge table
+
+fwrite(metMat, file = "metMat.csv", quote = "auto",sep = ",",  row.names = TRUE, col.names = TRUE)
+
+
+# replacing Nas with row means
+ind <- which(is.na(metMat), arr.ind=TRUE)
+metMat[ind] <- rowMeans(metMat,  na.rm = TRUE)[ind[,1]]
+
+# reverting rownames
+rownames(metMat) <- rN
+
+
+
+# splitting the dataframe into chuncks
+chuncks_list <- str(split(metMat, (as.numeric(nrow(metMat))-1) %/% 10000))
+
+df_list <- split(df, factor(sort(rank(row.names(df))%%50)))
