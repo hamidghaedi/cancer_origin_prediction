@@ -1,5 +1,6 @@
 # cancer_origin_prediction
-A deep learning approach to predict origin of cancer based on DNA methylation profile 
+A deep learning approach to predict origin of cancer based on DNA methylation profile . The base line model reached ~97% of accuracy on predicting the origin of cancer. 
+
 
 Data is coming from TCGA
 
@@ -116,6 +117,8 @@ all(rownames(metMat27) == rownames(metMat450))
 metMat <- rbind(metMat27, metMat450)
 
 # filtering based on the mc Intyr list:
+# link to article : https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-15-51
+
 mcIntyr <- data.table::fread("/home/ghaedi/projects/def-gooding-ab/ghaedi/methyl/txt_files/main_FinalMcIntyreKeepProbesAndInfo.csv")
 
 metMat <- metMat[rownames(metMat) %in% mcIntyr$ID,]
@@ -151,3 +154,4 @@ snp5.probe <- snp.probe$Name[snp.probe$Probe_maf <= 0.05]
 metMat <- metMat[row.names(metMat) %in% c(no.snp.probe, snp5.probe), ]
 
 ```
+The rest of analysis is based on the what could be find in the "CNN_jupyter notebook" jupyter notebook in the repository.
