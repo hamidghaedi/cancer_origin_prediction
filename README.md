@@ -1,9 +1,56 @@
-# Cancer origin prediction using methylation profiles by CNN
-A deep learning approach to predict origin of cancer based on DNA methylation profile . The base line model reached ~97% of accuracy on predicting the origin of cancer. 
+# Cancer Origin Prediction Using DNA Methylation Profiles
+
+## Background
+
+This project employs a convolutional neural network (CNN) to classify the origin of cancers based on DNA methylation profiles. The analysis achieves a high accuracy of ~97%, utilizing data from The Cancer Genome Atlas (TCGA). The project demonstrates the power of deep learning in cancer genomics, providing a robust framework for tumor origin classification and supporting precision oncology efforts.
+
+### Data Processing and Preprocessing
+
+1.	Data Source:
+DNA methylation data aligned to the hg38 genome was retrieved using the TCGAbiolinks library. Two platforms were considered:
+•	Illumina Human Methylation 450
+•	Illumina Human Methylation 27
+
+2.	Sample Selection and Filtering:
+•	Primary tumor samples with at least 100 cases per project were selected.
+•	Methylation probes were curated to exclude those on sex chromosomes (chrX and chrY) and probes with minor allele frequency (MAF) > 0.05.
+•	Missing data was imputed using row means for robustness.
+
+3.	Probe Annotation:
+•	Annotations were incorporated using the IlluminaHumanMethylation450kanno.ilmn12.hg19 package to ensure the biological relevance of selected probes.
 
 
-Data is coming from TCGA
+### Deep Learning Methodology
 
+1.	Model Architecture:
+A sequential neural network model was implemented using Keras. The structure includes:
+
+•	Input Layer: Accepts 17,380 features corresponding to methylation probe values.
+•	Hidden Layers: Three dense layers with ReLU activation to capture complex patterns.
+•	Output Layer: Softmax activation outputs class probabilities for 25 cancer types.
+
+3.	Training:
+•	The model was trained using the categorical cross-entropy loss function and optimized with the Adam optimizer.
+•	A 10-fold cross-validation strategy was applied to evaluate model performance.
+
+4.	Performance Metrics:
+•	Accuracy scores from cross-validation indicate the model's robust predictive capability with minimal variance.
+
+
+### Next ups:
+
+**Dealing with Batch Effects:** Apply methods like ComBat or quantile normalization to address systematic biases across datasets.
+
+**Incorporating Additional Data:** Integrate clinical variables such as tumor stage and grade to improve model precision.
+
+**Model Fine-Tuning:** Optimize model architecture and hyperparameters to enhance performance and reduce overfitting.
+
+**Adding Another Data Modality:** Explore integrating RNA-seq or DNA-seq data to create a multi-omics model for cancer origin prediction.
+
+
+## Analysis
+
+### data acquisition and processing
 ```R
 # DNA methylation aligned to hg38
 library(TCGAbiolinks)
@@ -154,4 +201,82 @@ snp5.probe <- snp.probe$Name[snp.probe$Probe_maf <= 0.05]
 metMat <- metMat[row.names(metMat) %in% c(no.snp.probe, snp5.probe), ]
 
 ```
-The rest of analysis is based on the what could be find in the "CNN_jupyter notebook" jupyter notebook in the repository.
+### CNN development
+Also available in the  "CNN_jupyter notebook" jupyter notebook in the repository.
+
+```python
+# importing libraries
+import pandas as pd
+import pyreadr
+import pandas
+from keras.models import Sequential
+from keras.layers import Dense
+from scikeras.wrappers import KerasClassifier
+from keras.utils import np_utils
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.pipeline import Pipeline
+```
+```python
+# reading data inot dataframes
+metMat = pyreadr.read_r('../metMat.RDS') 
+pD = pyreadr.read_r('../pD.RDS') 
+metMat = metMat[None]
+pD = pD[None]
+# convert to array
+met = metMat.values
+p = pD[['project']].values.ravel()
+# defining X and Y
+X = met.astype(float)
+Y = p
+```
+```python
+#Encode the Output Variable
+
+# encode class values as integers
+encoder = LabelEncoder()
+encoder.fit(Y)
+encoded_Y = encoder.transform(Y)
+# convert integers to dummy variables (i.e. one hot encoded)
+dummy_y = np_utils.to_categorical(encoded_Y)
+dummy_y
+```
+`
+array([[0., 1., 0., ..., 0., 0., 0.],
+       [0., 1., 0., ..., 0., 0., 0.],
+       [0., 1., 0., ..., 0., 0., 0.],
+       ...,
+       [0., 0., 0., ..., 0., 0., 1.],
+       [0., 0., 0., ..., 0., 0., 1.],
+       [0., 0., 0., ..., 0., 0., 1.]], dtype=float32)
+       `
+
+```python
+# define baseline model
+def baseline_model():
+    # create model
+    model = Sequential()
+    model.add(Dense(100, input_dim=17380, activation='relu'))
+    model.add(Dense(64,  activation='relu'))
+    model.add(Dense(64,  activation='relu'))
+    model.add(Dense(25, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+```
+```python
+...
+estimator = KerasClassifier(build_fn=baseline_model, epochs=200, batch_size=1000, verbose=1)
+...
+kfold = KFold(n_splits=10, shuffle=True)
+...
+results = cross_val_score(estimator, X, dummy_y, cv=kfold)
+print("Baseline: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+```
+
+`
+results
+array([0.96586345, 0.94678715, 0.95582329, 0.9688755 , 0.96084337,
+       0.95582329, 0.95883534, 0.96582915, 0.96582915, 0.96582915])
+`
