@@ -1,4 +1,4 @@
-# cancer_origin_prediction
+# Cancer origin prediction using methylation profiles by CNN
 A deep learning approach to predict origin of cancer based on DNA methylation profile . The base line model reached ~97% of accuracy on predicting the origin of cancer. 
 
 
